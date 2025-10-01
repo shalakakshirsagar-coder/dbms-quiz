@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DBMS Quiz with Leaderboard</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 700px; margin: 20px auto; }
+  #questionBox, #scoreboard, #leaderboard { margin-top: 20px; }
+  .option { background: #f0f0f0; margin: 5px 0; padding: 10px; cursor: pointer; border-radius: 4px; }
+  .option.selected { background: #cce5ff; }
+  .option.correct { background: #a2d5a2; }
+  .option.incorrect { background: #f7a1a1; }
+  button { padding: 8px 16px; margin: 10px 5px 0 0; font-size: 16px; }
+  #feedback { margin-top: 10px; font-weight: bold; }
+  #timer, #progress { font-weight: bold; margin-top: 10px; }
+  #badge {
+    display: none;
+    font-size: 2.5em;
+    font-weight: bold;
+    margin: 20px 0;
+    text-align: center;
+    animation: pop 0.6s ease forwards;
+  }
+  @keyframes pop {
+    0% { transform: scale(0); opacity: 0; }
+    70% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+  #leaderboardList { list-style-type: none; padding-left: 0; }
+  #leaderboardList li { padding: 5px 0; border-bottom: 1px solid #ddd; }
+  input[type=text] { padding: 8px; width: 200px; font-size: 16px; }
+</style>
+</head>
+<body>
+
+<h1>DBMS Quiz</h1>
+
+<div id="questionBox">
+  <div id="progress"></div>
+  <div id="timer"></div>
+  <h2 id="questionText"></h2>
+  <div id="optionsContainer"></div>
+  <div id="feedback"></div>
+  <button id="submitBtn" disabled>Submit</button>
+  <button id="nextBtn" disabled>Next</button>
+</div>
+
+<div id="scoreboard" style="display:none;">
+  <div>Your Score: <span id="score"></span> / 55</div>
+  <div id="badge"></div>
+  <div>
+    <input type="text" id="nameInput" placeholder="Enter your name" />
+    <button id="saveScoreBtn" disabled>Save Score</button>
+  </div>
+</div>
+
+<div id="leaderboard" style="display:none;">
+  <h2>Leaderboard</h2>
+  <ul id="leaderboardList"></ul>
+  <button id="restartBtn">Restart Quiz</button>
+</div>
+
+<script>
+const questions = [
+  // 55 questions covering ER modeling, SQL basics, DBMS architecture, DML, DDL, transactions, deadlock, 2PL, MongoDB, ACID vs BASE, semi-structured data etc.
+  {question:"What is serializability in transaction management?",correct_answer:"Ensuring concurrent transactions result in a state as if executed serially",incorrect_answers:["Running transactions in parallel","Locking all transactions","Delaying transactions"]},
+  {question:"Which isolation level prevents dirty reads?",correct_answer:"Read Committed",incorrect_answers:["Read Uncommitted","Repeatable Read","Serializable"]},
+  {question:"Which command deletes a table structure and data?",correct_answer:"DROP TABLE",incorrect_answers:["DELETE TABLE","REMOVE TABLE","ERASE TABLE"]},
+  {question:"What is a foreign key?",correct_answer:"A key that links two tables",incorrect_answers:["Primary key","Unique key","Composite key"]},
+  {question:"Which of the following is NOT a property of ACID?",correct_answer:"Availability",incorrect_answers:["Atomicity","Consistency","Durability"]},
+  {question:"In DBMS, what is a transaction?",correct_answer:"A sequence of operations performed as a single logical unit of work",incorrect_answers:["A database backup","A database query","A user session"]},
+  {question:"Which SQL keyword is used to sort the result set?",correct_answer:"ORDER BY",incorrect_answers:["SORT BY","GROUP BY","FILTER BY"]},
+  {question:"What is the purpose of normalization?",correct_answer:"To reduce data redundancy and improve data integrity",incorrect_answers:["To increase query speed","To backup data","To create more tables"]},
+  {question:"Which technique helps to avoid deadlocks?",correct_answer:"Wait-Die and Wound-Wait schemes",incorrect_answers:["Random killing","Ignoring deadlocks","Scheduling transactions in FIFO"]},
+  {question:"Which MongoDB feature allows sharding?",correct_answer:"Horizontal scaling",incorrect_answers:["Vertical scaling","Data replication","Indexing"]},
+  {question:"What is the difference between DDL and DML?",correct_answer:"DDL defines structure, DML manipulates data",incorrect_answers:["DDL manipulates data, DML defines structure","Both are same","DDL is faster"]},
+  {question:"Which schedule is conflict serializable?",correct_answer:"A schedule where all conflicting operations are ordered",incorrect_answers:["Any schedule","Schedules with deadlocks","Schedules without transactions"]},
+  {question:"What is the role of the query optimizer in DBMS?",correct_answer:"To determine the most efficient way to execute a query",incorrect_answers:["Execute the query","Create tables","Store data"]},
+  {question:"Which of the following is NOT a NoSQL database?",correct_answer:"MySQL",incorrect_answers:["MongoDB","Cassandra","Redis"]},
+  {question:"What is the difference between repeatable read and serializable isolation levels?",correct_answer:"Serializable prevents phantom reads, repeatable read does not",incorrect_answers:["Repeatable read prevents phantom reads","Both are same","Repeatable read is stricter"]},
+  {question:"What does a transaction log record?",correct_answer:"All changes made by transactions",incorrect_answers:["Only successful transactions","Only errors","User activity"]},
+  {question:"Which SQL command changes the structure of an existing table?",correct_answer:"ALTER TABLE",incorrect_answers:["MODIFY TABLE","CHANGE TABLE","UPDATE TABLE"]},
+  {question:"What is the main advantage of NoSQL databases?",correct_answer:"Flexible schema for semi-structured data",incorrect_answers:["Faster joins","Strong ACID compliance","Better security"]},
+  {question:"What is the function of the lock manager in DBMS?",correct_answer:"To manage concurrent access to data by transactions",incorrect_answers:["To lock user accounts","To back up data","To optimize queries"]},
+  {question:"What does 'dirty read' mean in DBMS?",correct_answer:"Reading uncommitted data from another transaction",incorrect_answers:["Reading committed data","Reading data twice","Reading deleted data"]},
+  {question:"Which command in SQL is used to remove duplicates from query results?",correct_answer:"DISTINCT",incorrect_answers:["UNIQUE","REMOVE DUPLICATES","FILTER"]},
+  {question:"What is phantom read phenomenon?",correct_answer:"A transaction reads new rows inserted by another transaction",incorrect_answers:["A transaction reads old data","Data corruption","Locking error"]},
+  {question:"Which data model is typically used for semi-structured data?",correct_answer:"XML/JSON-based models",incorrect_answers:["Relational model","Hierarchical model","Network model"]},
+  {question:"In 2PL, when are locks released?",correct_answer:"After the transaction completes",incorrect_answers:["Immediately after acquiring","Before transaction commits","Locks are never released"]},
+  {question:"What is the main purpose of the 'HAVING' clause in SQL?",correct_answer:"Filter groups after GROUP BY",incorrect_answers:["Filter rows before grouping","Sort groups","Create groups"]},
+  {question:"Which of the following is a property of semi-structured data?",correct_answer:"Data does not have a fixed schema",incorrect_answers:["Data must be numeric","Data is always in tables","Data is fully structured"]},
+  {question:"What is the main feature of ACID transactions?",correct_answer:"Ensure reliable and consistent transactions",incorrect_answers:["Faster queries","Flexible schema","Simple backup"]},
+  {question:"Which MongoDB operation is used to insert documents?",correct_answer:"insertOne() or insertMany()",incorrect_answers:["addDocument()","createEntry()","insertDocument()"]},
+  {question:"What is schedule serializability?",correct_answer:"A schedule is serializable if it is equivalent to some serial schedule",incorrect_answers:["A schedule where transactions run in parallel","A schedule with no conflicts","A schedule with deadlocks"]},
+  {question:"What is ER modeling used for?",correct_answer:"To visually represent database entities and relationships",incorrect_answers:["To write SQL queries","To design user interfaces","To optimize hardware"]},
+  {question:"Which SQL command is used to add a new column to a table?",correct_answer:"ALTER TABLE ADD COLUMN",incorrect_answers:["ADD COLUMN","INSERT COLUMN","UPDATE TABLE"]},
+  {question:"What does DML stand for?",correct_answer:"Data Manipulation Language",incorrect_answers:["Data Modeling Language","Database Management Layer","Data Markup Language"]},
+  {question:"Which transaction property ensures all or nothing?",correct_answer:"Atomicity",incorrect_answers:["Durability","Consistency","Isolation"]},
+  {question:"Which of these is NOT a DBMS architecture type?",correct_answer:"Client-Only Architecture",incorrect_answers:["Two-Tier Architecture","Three-Tier Architecture","Distributed Architecture"]},
+  {question:"What does a deadlock in DBMS refer to?",correct_answer:"Two or more transactions waiting indefinitely for resources",incorrect_answers:["System crash","Data inconsistency","Successful commit"]},
+  {question:"What is the role of the 'COMMIT' command?",correct_answer:"Permanently save changes made in a transaction",incorrect_answers:["Undo changes","Start a transaction","Rollback changes"]},
+  {question:"What is the base principle of BASE compared to ACID?",correct_answer:"Basically Available, Soft state, Eventually consistent",incorrect_answers:["Always Consistent, Immediate Durability","Strict Locking","Full Atomicity"]},
+  {question:"Which SQL command is used to retrieve data from a table?",correct_answer:"SELECT",incorrect_answers:["GET","READ","FETCH"]},
+  {question:"What does the term 'locking' mean in DBMS?",correct_answer:"Controlling concurrent access to data",incorrect_answers:["Deleting data","Backing up data","Running queries"]},
+  {question:"Which isolation level is the strictest?",correct_answer:"Serializable",incorrect_answers:["Read Committed","Repeatable Read","Read Uncommitted"]},
+  {question:"Which of these is NOT a feature of MongoDB?",correct_answer:"Fixed schema",incorrect_answers:["Document-oriented","Scalable","Flexible schema"]},
+  {question:"What does 'DDL' stand for in databases?",correct_answer:"Data Definition Language",incorrect_answers:["Data Distribution Layer","Data Duplication Logic","Data Download Link"]},
+  {question:"Which SQL clause is used to filter records?",correct_answer:"WHERE",incorrect_answers:["FILTER","SELECT","SORT"]},
+  {question:"What type of data does the 'JSON' format represent?",correct_answer:"Semi-structured data",incorrect_answers:["Unstructured data","Structured data","Binary data"]},
+  {question:"What is a composite key?",correct_answer:"A key made up of two or more columns",incorrect_answers:["A single column key","A foreign key","A unique key"]},
+  {question:"Which type of lock allows multiple transactions to read but not write?",correct_answer:"Shared lock",incorrect_answers:["Exclusive lock","Update lock","No lock"]},
+  {question:"What is the difference between DELETE and TRUNCATE commands?",correct_answer:"DELETE removes rows one by one and logs, TRUNCATE removes all rows quickly",incorrect_answers:["TRUNCATE logs each row deletion","DELETE cannot remove rows","They are identical"]},
+  {question:"Which technique is used for concurrency control in DBMS?",correct_answer:"Two-Phase Locking (2PL)",incorrect_answers:["Multiversion Concurrency Control","No concurrency control","Batch processing"]},
+  {question:"What is the purpose of indexing in databases?",correct_answer:"To speed up data retrieval",incorrect_answers:["To slow down queries","To encrypt data","To backup data"]},
+  {question:"What does the acronym 'ER' stand for in ER modeling?",correct_answer:"Entity-Relationship",incorrect_answers:["Extended Relational","Electronic Resource","Entity Registry"]},
+  {question:"Which of the following describes a 'deadlock prevention' method?",correct_answer:"Transactions request all locks at once",incorrect_answers:["Transactions wait indefinitely","Transactions ignore locks","Random killing"]},
+  {question:"Which MongoDB feature supports transactions?",correct_answer:"Multi-document ACID transactions",incorrect_answers:["No transactions","Only single document transactions","Manual commit"]},
+  {question:"Which SQL keyword groups rows that have the same values?",correct_answer:"GROUP BY",incorrect_answers:["ORDER BY","HAVING","SORT BY"]},
+  {question:"Which command undoes changes in a transaction?",correct_answer:"ROLLBACK",incorrect_answers:["UNDO","REVERT","CANCEL"]},
+  {question:"What is a surrogate key?",correct_answer:"A system-generated unique key",incorrect_answers:["A natural key","A foreign key","A composite key"]},
+];
+
+let currentQuestionIndex = 0;
+let score = 0;
+let selectedOption = null;
+let timer;
+let timeLeft = 30;
+
+const questionText = document.getElementById('questionText');
+const optionsContainer = document.getElementById('optionsContainer');
+const submitBtn = document.getElementById('submitBtn');
+const nextBtn = document.getElementById('nextBtn');
+const feedback = document.getElementById('feedback');
+const timerEl = document.getElementById('timer');
+const progressEl = document.getElementById('progress');
+const scoreboard = document.getElementById('scoreboard');
+const scoreEl = document.getElementById('score');
+const badge = document.getElementById('badge');
+const nameInput = document.getElementById('nameInput');
+const saveScoreBtn = document.getElementById('saveScoreBtn');
+const leaderboard = document.getElementById('leaderboard');
+const leaderboardList = document.getElementById('leaderboardList');
+const restartBtn = document.getElementById('restartBtn');
+const questionBox = document.getElementById('questionBox');
+
+function shuffle(array) {
+  for(let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i+1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
+function loadQuestion(index) {
+  clearInterval(timer);
+  timeLeft = 30;
+  timerEl.textContent = `Time left: ${timeLeft}s`;
+  timer = setInterval(() => {
+    timeLeft--;
+    timerEl.textContent = `Time left: ${timeLeft}s`;
+    if(timeLeft <= 0){
+      clearInterval(timer);
+      submitBtn.disabled = true;
+      nextBtn.disabled = false;
+      showCorrectAnswer();
+      feedback.textContent = "Time's up!";
+    }
+  }, 1000);
+
+  progressEl.textContent = `Question ${index + 1} of ${questions.length}`;
+  const q = questions[index];
+  questionText.textContent = q.question;
+
+  // Build options
+  let opts = [q.correct_answer, ...q.incorrect_answers];
+  shuffle(opts);
+
+  optionsContainer.innerHTML = '';
+  selectedOption = null;
+  submitBtn.disabled = true;
+  nextBtn.disabled = true;
+  feedback.textContent = '';
+
+  opts.forEach(opt => {
+    const div = document.createElement('div');
+    div.className = 'option';
+    div.textContent = opt;
+    div.onclick = () => {
+      if(submitBtn.disabled) submitBtn.disabled = false;
+      // Deselect others
+      [...optionsContainer.children].forEach(c => c.classList.remove('selected'));
+      div.classList.add('selected');
+      selectedOption = opt;
+    };
+    optionsContainer.appendChild(div);
+  });
+}
+
+function showCorrectAnswer() {
+  [...optionsContainer.children].forEach(div => {
+    if(div.textContent === questions[currentQuestionIndex].correct_answer) {
+      div.classList.add('correct');
+    } else if(div.classList.contains('selected') && div.textContent !== questions[currentQuestionIndex].correct_answer) {
+      div.classList.add('incorrect');
+    }
+    div.style.pointerEvents = 'none'; // Disable clicking after submit
+  });
+}
+
+submitBtn.addEventListener('click', () => {
+  clearInterval(timer);
+  submitBtn.disabled = true;
+  nextBtn.disabled = false;
+
+  if(selectedOption === questions[currentQuestionIndex].correct_answer) {
+    score++;
+    feedback.textContent = 'Correct!';
+  } else {
+    feedback.textContent = `Wrong! Correct answer: ${questions[currentQuestionIndex].correct_answer}`;
+  }
+  showCorrectAnswer();
+});
+
+nextBtn.addEventListener('click', () => {
+  currentQuestionIndex++;
+  if(currentQuestionIndex < questions.length) {
+    loadQuestion(currentQuestionIndex);
+  } else {
+    endQuiz();
+  }
+});
+
+function endQuiz() {
+  questionBox.style.display = 'none';
+  scoreboard.style.display = 'block';
+  leaderboard.style.display = 'none';
+  scoreEl.textContent = score;
+
+  // Show badge message big and pop
+  let badgeText = '';
+  if(score >= 50) badgeText = '🏅 Outstanding! Perfect or near perfect!';
+  else if(score >= 40) badgeText = '🏅 Excellent Work!';
+  else if(score >= 30) badgeText = '👍 Good Job!';
+  else if(score >= 20) badgeText = '🙂 Keep Practicing!';
+  else badgeText = '😕 Better Luck Next Time!';
+  badge.textContent = badgeText;
+  badge.style.display = 'block';
+
+  nameInput.value = '';
+  saveScoreBtn.disabled = true;
+}
+
+function saveScore() {
+  const name = nameInput.value.trim();
+  if(!name) return alert('Please enter your name.');
+
+  const leaderboardData = JSON.parse(localStorage.getItem('dbms_leaderboard')) || [];
+  leaderboardData.push({name, score});
+  leaderboardData.sort((a,b) => b.score - a.score);
+  if(leaderboardData.length > 10) leaderboardData.length = 10; // keep top 10
+  localStorage.setItem('dbms_leaderboard', JSON.stringify(leaderboardData));
+
+  alert('Score saved!');
+  showLeaderboard();
+}
+
+function showLeaderboard() {
+  scoreboard.style.display = 'none';
+  leaderboard.style.display = 'block';
+  leaderboardList.innerHTML = '';
+
+  const leaderboardData = JSON.parse(localStorage.getItem('dbms_leaderboard')) || [];
+  if(leaderboardData.length === 0) {
+    leaderboardList.innerHTML = '<li>No scores yet.</li>';
+  } else {
+    leaderboardData.forEach(entry => {
+      const li = document.createElement('li');
+      li.textContent = `${entry.name} - ${entry.score} / ${questions.length}`;
+      leaderboardList.appendChild(li);
+    });
+  }
+}
+
+saveScoreBtn.addEventListener('click', saveScore);
+nameInput.addEventListener('input', () => {
+  saveScoreBtn.disabled = nameInput.value.trim() === '';
+});
+restartBtn.addEventListener('click', () => {
+  leaderboard.style.display = 'none';
+  currentQuestionIndex = 0;
+  score = 0;
+  questionBox.style.display = 'block';
+  loadQuestion(currentQuestionIndex);
+  nameInput.value = '';
+  saveScoreBtn.disabled = true;
+  badge.style.display = 'none';
+  feedback.textContent = '';
+});
+
+window.onload = () => {
+  loadQuestion(currentQuestionIndex);
+};
+</script>
+
+</body>
+</html>
